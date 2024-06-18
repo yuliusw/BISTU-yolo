@@ -1,13 +1,11 @@
 # Ultralytics YOLO 🚀, AGPL-3.0 license
 """Block modules."""
 
-from paddle import split,concat
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-
 
 from .conv import Conv, DWConv, GhostConv, LightConv, RepConv, autopad
 from .transformer import TransformerBlock
 
+from einops import rearrange
 
 
 from typing import Tuple, Optional
@@ -15,16 +13,7 @@ from typing import Tuple, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange
 from torch import Tensor, LongTensor
-try:
-    from mmdet.models.builder import BACKBONES as det_BACKBONES
-    from mmdet.utils import get_root_logger
-    from mmcv.runner import _load_checkpoint
-    has_mmdet = True
-except ImportError:
-    print("If for detection, please install mmdetection first")
-    has_mmdet = False
 
 
 
@@ -359,7 +348,7 @@ class Bottleneck(nn.Module):
     def forward(self, x):
         """'forward()' applies the YOLO FPN to input data."""
         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
-class PConv(nn.Layer):
+class PConv(nn.Module):
     def __init__(self, dim, kernel_size=3, n_div=4):
         super().__init__()
 
@@ -370,9 +359,9 @@ class PConv(nn.Layer):
                               bias_attr=False)
 
     def forward(self, x):
-        x1, x2 = paddle.split(x, [self.dim_conv, self.dim_untouched], axis=1)
+        x1, x2 = torch.split(x, [self.dim_conv, self.dim_untouched], dim=1)
         x1 = self.conv(x1)
-        x = paddle.concat([x1, x2], axis=1)
+        x = torch.concat([x1, x2], dim=1)
 
         return x
 class DropPath(nn.Module):
@@ -390,7 +379,7 @@ class DropPath(nn.Module):
         output = x.div(keep_prob) * random_tensor
         return output
 
-class FasterNetBlock(nn.Layer):
+class FasterNetBlock(nn.Module):
     def __init__(self, dim, expand_ratio=2, act_layer=nn.ReLU, drop_path_rate=0.0):
         super().__init__()
 
